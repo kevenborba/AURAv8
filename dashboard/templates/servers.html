@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div x-data="serverManager()" x-init="fetchData()" class="space-y-8">
+
+    <!-- Header -->
+    <div class="flex justify-between items-end">
+        <div>
+            <h1 class="text-3xl font-bold text-white">Servidores & Dados</h1>
+            <p class="text-gray-400">Gerencie onde o bot está e limpe dados antigos.</p>
+        </div>
+    </div>
+
+    <!-- Fila de Limpeza (Servers que kickaram o bot) -->
+    <div x-show="cleaningQueue.length > 0" class="glass-card rounded-2xl overflow-hidden border-red-500/30">
+        <div class="bg-red-500/10 p-4 border-b border-red-500/20 flex justify-between items-center">
+            <h3 class="text-red-400 font-bold flex items-center gap-2">
+                🗑️ Fila de Limpeza (Dados Órfãos)
+            </h3>
+            <span class="text-xs text-red-300 bg-red-500/20 px-2 py-1 rounded">Ação Recomendada</span>
+        </div>
+        <table class="w-full text-left text-gray-300">
+            <thead class="bg-white/5 text-xs uppercase font-semibold text-gray-400">
+                <tr>
+                    <th class="p-4">Guild ID</th>
+                    <th class="p-4">Data de Saída</th>
+                    <th class="p-4 text-right">Ação</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-white/5">
+                <template x-for="item in cleaningQueue" :key="item.target_id">
+                    <tr class="hover:bg-white/5 transition">
+                        <td class="p-4 font-mono" x-text="item.target_id"></td>
+                        <td class="p-4" x-text="item.timestamp"></td>
+                        <td class="p-4 text-right">
+                            <button @click="purgeData(item.target_id)"
+                                class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-bold transition shadow-lg shadow-red-500/20">
+                                LIMPAR DADOS
+                            </button>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Lista de Servidores Ativos -->
+    <div class="glass-card rounded-2xl overflow-hidden">
+        <div class="p-4 border-b border-white/10">
+            <h3 class="text-white font-bold">Servidores Ativos</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-gray-300">
+                <thead class="bg-white/5 text-xs uppercase font-semibold text-gray-400">
+                    <tr>
+                        <th class="p-4">Nome</th>
+                        <th class="p-4">ID</th>
+                        <th class="p-4">Membros</th>
+                        <th class="p-4">Dono</th>
+                        <th class="p-4 text-right">Ações</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5">
+                    <template x-for="guild in activeGuilds" :key="guild.id">
+                        <tr class="hover:bg-white/5 transition">
+                            <td class="p-4 flex items-center gap-3">
+                                <img :src="guild.icon || 'https://cdn.discordapp.com/embed/avatars/0.png'"
+                                    class="w-8 h-8 rounded-full">
+                                <span class="font-bold text-white" x-text="guild.name"></span>
+                            </td>
+                            <td class="p-4 font-mono text-xs" x-text="guild.id"></td>
+                            <td class="p-4" x-text="guild.member_count"></td>
+                            <td class="p-4 text-xs" x-text="guild.owner_id"></td>
+                            <td class="p-4 text-right flex justify-end gap-2">
+                                <button @click="ghostJoin(guild.id)"
+                                    class="p-2 hover:bg-purple-500/20 text-purple-400 rounded transition"
+                                    title="Ghost Join (Gerar Convite)">
+                                    👻
+                                </button>
+                                <button @click="leaveGuild(guild.id)"
+                                    class="p-2 hover:bg-red-500/20 text-red-400 rounded transition"
+                                    title="Sair do Servidor">
+                                    🚪
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    function serverManager() {
+        return {
+            activeGuilds: [],
+            cleaningQueue: [],
+
+            async fetchData() {
+                const res = await fetch('/owner/api/servers');
+                const data = await res.json();
+                console.log("Servers Data:", data); // DEBUG
+                this.activeGuilds = data.active;
+                this.cleaningQueue = data.cleaning_queue;
+            },
+
+            async purgeData(guild_id) {
+                if (!confirm(`⚠️ PERIGO: Isso vai apagar TODOS os dados do servidor ${guild_id} do banco de dados.\n\nConfigurações, Tickets, Logs... TUDO.\n\nTem certeza?`)) return;
+
+                const res = await fetch('/owner/api/servers/purge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ guild_id })
+                });
+                const data = await res.json();
+                alert(data.message);
+                this.fetchData();
+            },
+
+            async ghostJoin(guild_id) {
+                const res = await fetch('/owner/api/ghost_join', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ guild_id })
+                });
+                const data = await res.json();
+
+                if (data.invite_url) {
+                    prompt("Convite Gerado (Copia aí):", data.invite_url);
+                    window.open(data.invite_url, '_blank');
+                } else {
+                    alert("Erro: " + data.error);
+                }
+            },
+
+            async leaveGuild(guild_id) {
+                if (!confirm("Forçar o bot a sair deste servidor?")) return;
+                await fetch('/owner/api/servers/leave', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ guild_id })
+                });
+                this.fetchData();
+            }
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div x-data="licenseManager()" x-init="fetchLicenses()" class="space-y-8">
+
+    <!-- Header -->
+    <div class="flex justify-between items-end">
+        <div>
+            <h1 class="text-3xl font-bold text-white">Gerenciamento de Licenças</h1>
+            <p class="text-gray-400">Controle quem pode usar o AURA.</p>
+        </div>
+        <button @click="openModal()"
+            class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition shadow-lg shadow-purple-500/20 flex items-center gap-2">
+            <span>➕</span> Nova Licença
+        </button>
+    </div>
+
+    <!-- Tabela de Licenças -->
+    <div class="glass-card rounded-2xl overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-gray-300">
+                <thead class="bg-white/5 text-xs uppercase font-semibold text-gray-400">
+                    <tr>
+                        <th class="p-4">Cliente / Guild ID</th>
+                        <th class="p-4">Status</th>
+                        <th class="p-4">Expira em</th>
+                        <th class="p-4">Tier</th>
+                        <th class="p-4">Max Users</th>
+                        <th class="p-4 text-right">Ações</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5">
+                    <template x-for="lic in licenses" :key="lic.guild_id">
+                        <tr class="hover:bg-white/5 transition">
+                            <td class="p-4">
+                                <div class="font-bold text-white" x-text="lic.client_name"></div>
+                                <div class="text-xs text-gray-500 font-mono" x-text="lic.guild_id"></div>
+                            </td>
+                            <td class="p-4">
+                                <span :class="{
+                                    'bg-green-500/20 text-green-400': lic.status === 'active',
+                                    'bg-red-500/20 text-red-400': lic.status === 'locked',
+                                    'bg-yellow-500/20 text-yellow-400': lic.status === 'grace_period'
+                                }" class="px-2 py-1 rounded text-xs font-bold uppercase" x-text="lic.status"></span>
+                            </td>
+                            <td class="p-4">
+                                <div x-text="formatDate(lic.expiration_date)"></div>
+                                <div class="text-xs text-gray-500" x-text="daysLeft(lic.expiration_date)"></div>
+                            </td>
+                            <td class="p-4">
+                                <span class="px-2 py-1 rounded text-xs font-bold uppercase"
+                                    :class="lic.tier === 'organization' ? 'bg-purple-500/20 text-purple-400' : 'bg-blue-500/20 text-blue-400'"
+                                    x-text="lic.tier || 'start'"></span>
+                            </td>
+                            <td class="p-4" x-text="lic.max_users"></td>
+                            <td class="p-4 text-right space-x-2">
+                                <button @click="editLicense(lic)"
+                                    class="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 px-3 py-1 rounded transition text-xs font-bold">
+                                    ✏️ EDITAR
+                                </button>
+                                <button @click="renewLicense(lic.guild_id)"
+                                    class="text-green-400 hover:text-green-300 hover:bg-green-500/10 px-3 py-1 rounded transition text-xs font-bold">
+                                    🔄 RENOVAR
+                                </button>
+                                <button @click="deleteLicense(lic.guild_id)"
+                                    class="text-red-400 hover:text-red-300 hover:bg-red-500/10 px-3 py-1 rounded transition text-xs font-bold">
+                                    🗑️ DELETAR
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+        <!-- Empty State -->
+        <div x-show="licenses.length === 0" class="p-8 text-center text-gray-500">
+            Nenhuma licença encontrada.
+        </div>
+    </div>
+
+    <!-- Modal Adicionar Licença -->
+    <div x-show="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+        style="display: none;">
+        <div @click.away="showModal = false"
+            class="bg-[#1a1625] border border-white/10 p-8 rounded-2xl w-full max-w-md space-y-6 relative shadow-2xl">
+            <h2 class="text-2xl font-bold text-white mb-6" x-text="isEditing ? 'Editar Licença' : 'Nova Licença'"></h2>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">ID do Servidor (Guild ID)</label>
+                    <input type="text" x-model="form.guild_id" :disabled="isEditing"
+                        class="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-white focus:border-purple-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                        placeholder="Ex: 123456789012345678">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Nome do Cliente</label>
+                    <input type="text" x-model="form.client_name"
+                        class="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-white focus:border-purple-500 outline-none"
+                        placeholder="Ex: Cidade Alta">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Duração (Dias)</label>
+                        <input type="number" x-model="form.days"
+                            class="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-white focus:border-purple-500 outline-none"
+                            placeholder="Ex: 30">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Max Users</label>
+                        <input type="number" x-model="form.max_users"
+                            class="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-white focus:border-purple-500 outline-none"
+                            value="100">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Tier (Plano)</label>
+                    <select x-model="form.tier"
+                        class="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-white focus:border-purple-500 outline-none">
+                        <option value="start">🎫 Start (Básico)</option>
+                        <option value="faction">⚔️ Facção (Crime)</option>
+                        <option value="police">👮 Police (Corporação)</option>
+                        <option value="v8">💎 Aura V8 (God Mode)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-4">
+                <button @click="showModal = false"
+                    class="px-4 py-2 text-gray-400 hover:text-white transition">Cancelar</button>
+                <button @click="createLicense()"
+                    class="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition font-bold">Criar
+                    Licença</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    function licenseManager() {
+        return {
+            licenses: [],
+            showModal: false,
+            isEditing: false,
+            form: { guild_id: '', client_name: '', months: 1, max_users: 100, tier: 'start' },
+
+            async fetchLicenses() {
+                const res = await fetch('/owner/api/licenses');
+                this.licenses = await res.json();
+            },
+
+            openModal() {
+                this.form = { guild_id: '', client_name: '', days: 30, max_users: 100, tier: 'start' };
+                this.isEditing = false;
+                this.showModal = true;
+            },
+
+            editLicense(license) {
+                this.form = {
+                    guild_id: license.guild_id,
+                    client_name: license.client_name,
+                    days: 30, // Padrão ao editar, usuário define novo prazo a partir de hoje
+                    max_users: license.max_users,
+                    tier: license.tier
+                };
+                this.isEditing = true;
+                this.showModal = true;
+            },
+
+            async createLicense() {
+                if (!this.form.guild_id) return alert("ID do Servidor obrigatório!");
+
+                await fetch('/owner/api/licenses/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.form)
+                });
+                this.showModal = false;
+                this.fetchLicenses();
+            },
+
+            async deleteLicense(guild_id) {
+                if (!confirm("Tem certeza? Isso vai bloquear o bot neste servidor.")) return;
+                await fetch('/owner/api/licenses/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ guild_id })
+                });
+                this.fetchLicenses();
+            },
+
+            async renewLicense(guild_id) {
+                await fetch('/owner/api/licenses/renew', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ guild_id })
+                });
+                this.fetchLicenses();
+            },
+
+            formatDate(dateStr) {
+                return new Date(dateStr).toLocaleDateString('pt-BR');
+            },
+
+            daysLeft(dateStr) {
+                const diff = new Date(dateStr) - new Date();
+                const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+                return days > 0 ? `${days} dias restantes` : 'Vencido';
+            }
+        }
+    }
+</script>
+{% endblock %}

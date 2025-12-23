@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div x-data="consoleViewer()" x-init="startPolling()" class="space-y-6 h-[calc(100vh-200px)] flex flex-col">
+
+    <!-- Header -->
+    <div class="flex justify-between items-center bg-black/40 p-4 rounded-t-xl border border-white/10 border-b-0">
+        <h1 class="text-xl font-bold text-green-400 font-mono flex items-center gap-2">
+            <span>💻</span> TERMINAL_ACCESS
+        </h1>
+        <div class="flex items-center gap-4">
+            <span class="text-xs text-gray-500 animate-pulse">● LIVE CONNECTION</span>
+            <button @click="togglePause()" class="px-3 py-1 text-xs font-bold rounded transition"
+                :class="paused ? 'bg-yellow-500/20 text-yellow-500' : 'bg-green-500/20 text-green-500'">
+                <span x-text="paused ? '⏸️ PAUSADO' : '▶️ RODANDO'"></span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Terminal Window -->
+    <div class="flex-grow bg-[#0c0c0c] rounded-b-xl border border-white/10 p-4 font-mono text-xs md:text-sm overflow-y-auto shadow-2xl relative custom-scrollbar group"
+        id="terminal-window">
+
+        <!-- Logs -->
+        <div class="space-y-1">
+            <template x-for="(log, index) in logs" :key="index">
+                <div class="break-words" :class="getLogColor(log)">
+                    <span class="opacity-50 select-none mr-2">➜</span>
+                    <span x-text="log"></span>
+                </div>
+            </template>
+        </div>
+
+        <!-- Scroll Anchor -->
+        <div id="scroll-anchor"></div>
+
+        <!-- Loading State -->
+        <div x-show="logs.length === 0" class="absolute inset-0 flex items-center justify-center text-gray-700">
+            <span class="animate-pulse">_aguardando logs...</span>
+        </div>
+    </div>
+
+</div>
+
+<style>
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+        bg: #000;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #333;
+        border-radius: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+</style>
+
+<script>
+    function consoleViewer() {
+        return {
+            logs: [],
+            paused: false,
+            interval: null,
+
+            startPolling() {
+                this.fetchLogs();
+                this.interval = setInterval(() => {
+                    if (!this.paused) this.fetchLogs();
+                }, 2000);
+            },
+
+            async fetchLogs() {
+                try {
+                    const res = await fetch('/owner/api/console');
+                    const data = await res.json();
+
+                    // Só atualiza se tiver mudança (simples diff check pelo tamanho ou conteúdo)
+                    if (JSON.stringify(data) !== JSON.stringify(this.logs)) {
+                        this.logs = data;
+                        this.scrollToBottom();
+                    }
+                } catch (e) {
+                    console.error("Erro no console:", e);
+                }
+            },
+
+            togglePause() {
+                this.paused = !this.paused;
+            },
+
+            scrollToBottom() {
+                // Só rola se o usuário não estiver segurando o scroll pra cima (opcional, aqui forçamos sempre se não pausado)
+                this.$nextTick(() => {
+                    const terminal = document.getElementById('terminal-window');
+                    terminal.scrollTop = terminal.scrollHeight;
+                });
+            },
+
+            getLogColor(log) {
+                if (log.includes('ERROR') || log.includes('CRITICAL')) return 'text-red-400 font-bold';
+                if (log.includes('WARNING')) return 'text-yellow-400';
+                if (log.includes('DEBUG')) return 'text-blue-400';
+                if (log.includes('INFO')) return 'text-gray-300';
+                return 'text-green-300'; // Default Matrix style
+            }
+        }
+    }
+</script>
+{% endblock %}

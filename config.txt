@@ -1,0 +1,19 @@
+# ARQUIVO: config.py
+# (Deve estar na mesma pasta do main.py)
+
+# Cores
+EMBED_COLOR = 0x000000 
+
+# Emojis (Mude os IDs aqui)
+EMOJI_PING = "<a:arrow_branco:1443476775949832193>"      
+EMOJI_DB = "<a:arrow_branco:1443476775949832193>"        
+EMOJI_CPU = "<a:arrow_branco:1443476775949832193>"       
+EMOJI_RAM = "<a:arrow_branco:1443476775949832193>"       
+EMOJI_SERVER = "<a:arrow_branco:1443476775949832193>"
+
+EMOJI_ONLINE = "<a:g_verify3:1443476777916825751>"    
+EMOJI_WARN = "<a:fogo:1443476795268665467>"
+EMOJI_CRITICAL = "<a:gifbotcarpi:1443476779376578730>"
+EMOJI_LOADING = "<a:load:1443476780697518141>"   
+
+STATUS_ACTIVITY = "Gerenciando a Cidade"

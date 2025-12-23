@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div x-data="spyManager()" x-init="fetchServers()" class="h-[calc(100vh-140px)] flex flex-col md:flex-row gap-6">
+
+    <!-- Sidebar: Seleção de Servidor e Canal -->
+    <div class="w-full md:w-1/4 flex flex-col gap-4">
+        <!-- Server List -->
+        <div class="glass-card p-4 rounded-xl flex-1 overflow-y-auto custom-scrollbar">
+            <h3 class="text-xs font-bold text-gray-500 uppercase mb-3 px-2">Servidores</h3>
+            <div class="space-y-1">
+                <template x-for="guild in guilds" :key="guild.id">
+                    <button @click="selectGuild(guild)"
+                        class="w-full text-left p-3 rounded-lg flex items-center gap-3 transition"
+                        :class="selectedGuild?.id === guild.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'hover:bg-white/5 text-gray-300'">
+                        <img :src="guild.icon || 'https://cdn.discordapp.com/embed/avatars/0.png'"
+                            class="w-8 h-8 rounded-full bg-gray-700">
+                        <div class="overflow-hidden">
+                            <div class="text-sm font-bold truncate" x-text="guild.name"></div>
+                            <div class="text-[10px] opacity-70" x-text="guild.id"></div>
+                        </div>
+                    </button>
+                </template>
+            </div>
+        </div>
+
+        <!-- Channel List -->
+        <div class="glass-card p-4 rounded-xl flex-1 overflow-y-auto custom-scrollbar" x-show="selectedGuild">
+            <h3 class="text-xs font-bold text-gray-500 uppercase mb-3 px-2">Canais de Texto</h3>
+            <div x-show="loadingChannels" class="text-center py-4 text-gray-500 animate-pulse">Carregando...</div>
+            <div class="space-y-1">
+                <template x-for="channel in channels" :key="channel.id">
+                    <button @click="selectChannel(channel)"
+                        class="w-full text-left px-3 py-2 rounded flex items-center gap-2 transition"
+                        :class="selectedChannel?.id === channel.id ? 'bg-white/10 text-white' : 'hover:bg-white/5 text-gray-400'">
+                        <span class="text-gray-500">#</span>
+                        <span class="text-sm truncate" x-text="channel.name"></span>
+                    </button>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main View: Chat History -->
+    <div
+        class="glass-card rounded-xl flex-grow overflow-hidden flex flex-col relative w-full md:w-3/4 bg-[#36393f] border border-[#202225]">
+
+        <!-- Chat Header -->
+        <div class="h-14 border-b border-[#202225] flex items-center px-4 bg-[#36393f] shadow-sm z-10 shrink-0">
+            <div x-show="selectedChannel" class="flex items-center gap-2">
+                <span class="text-2xl text-gray-400">#</span>
+                <span class="font-bold text-white text-lg" x-text="selectedChannel.name"></span>
+                <span class="text-xs text-gray-500 ml-2" x-text="selectedChannel.id"></span>
+            </div>
+            <div x-show="!selectedChannel" class="text-gray-500 italic">Selecione um canal para espiar...</div>
+
+            <div class="ml-auto" x-show="selectedChannel">
+                <button @click="refreshChat()"
+                    class="p-2 text-gray-400 hover:text-white transition rounded-full hover:bg-white/10"
+                    title="Atualizar">
+                    🔄
+                </button>
+            </div>
+        </div>
+
+        <!-- Messages Area -->
+        <div class="flex-grow overflow-y-auto p-4 space-y-4 custom-scrollbar bg-[#36393f]" id="chat-scroller">
+
+            <div x-show="loadingMessages"
+                class="absolute inset-0 flex items-center justify-center bg-[#36393f]/80 z-20">
+                <div class="animate-spin text-indigo-500 text-2xl">⏳</div>
+            </div>
+
+            <template x-for="msg in messages" :key="msg.id">
+                <div class="flex gap-4 group hover:bg-[#32353b] -mx-4 px-4 py-1 transition-colors">
+                    <!-- Avatar -->
+                    <img :src="msg.author.avatar || 'https://cdn.discordapp.com/embed/avatars/0.png'"
+                        class="w-10 h-10 rounded-full bg-gray-700 mt-1 cursor-pointer hover:opacity-80 transition shrink-0">
+
+                    <div class="min-w-0 flex-1">
+                        <!-- Author Metadata -->
+                        <div class="flex items-baseline gap-2">
+                            <span class="font-medium hover:underline cursor-pointer"
+                                :class="msg.author.bot ? 'text-indigo-400' : 'text-white'"
+                                x-text="msg.author.username"></span>
+
+                            <span x-show="msg.author.bot"
+                                class="bg-[#5865f2] text-white text-[10px] px-1 rounded uppercase font-bold h-4 flex items-center">BOT</span>
+
+                            <span class="text-xs text-gray-400" x-text="formatDate(msg.timestamp)"></span>
+                        </div>
+
+                        <!-- Content -->
+                        <div class="text-gray-300 whitespace-pre-wrap break-words leading-relaxed"
+                            x-html="formatContent(msg.content)"></div>
+
+                        <!-- Attachments -->
+                        <template x-for="att in msg.attachments">
+                            <div class="mt-2">
+                                <a :href="att.url" target="_blank">
+                                    <img :src="att.url"
+                                        class="max-h-60 rounded-lg border border-white/10 hover:border-indigo-500 transition">
+                                </a>
+                            </div>
+                        </template>
+
+                        <!-- Embeds (Simple Placeholder) -->
+                        <div x-show="msg.embeds.length > 0"
+                            class="mt-2 text-xs text-gray-500 italic bg-[#2f3136] p-2 rounded border-l-4 border-indigo-500 w-fit">
+                            [Embed Content Hidden]
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Empty State -->
+            <div x-show="!loadingMessages && messages.length === 0 && selectedChannel"
+                class="text-center text-gray-500 mt-10">
+                Nenhuma mensagem recente ou falha ao carregar.
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<style>
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: #2f3136;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #202225;
+        border-radius: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #40444b;
+    }
+</style>
+
+<script>
+    function spyManager() {
+        return {
+            guilds: [],
+            selectedGuild: null,
+            channels: [],
+            selectedChannel: null,
+            messages: [],
+            loadingChannels: false,
+            loadingMessages: false,
+
+            async fetchServers() {
+                const res = await fetch('/owner/api/servers');
+                const data = await res.json();
+                this.guilds = data.active;
+            },
+
+            async selectGuild(guild) {
+                this.selectedGuild = guild;
+                this.selectedChannel = null;
+                this.messages = [];
+                this.channels = [];
+                this.loadingChannels = true;
+
+                try {
+                    const res = await fetch(`/owner/api/spy/channels?guild_id=${guild.id}`);
+                    this.channels = await res.json();
+                } catch (e) {
+                    alert("Erro ao listar canais: " + e);
+                } finally {
+                    this.loadingChannels = false;
+                }
+            },
+
+            async selectChannel(channel) {
+                this.selectedChannel = channel;
+                this.refreshChat();
+            },
+
+            async refreshChat() {
+                if (!this.selectedChannel) return;
+                this.loadingMessages = true;
+
+                try {
+                    const res = await fetch(`/owner/api/spy/history?channel_id=${this.selectedChannel.id}&guild_id=${this.selectedGuild.id}`);
+                    const data = await res.json();
+
+                    if (data.error) throw data.error;
+
+                    this.messages = data.messages.reverse(); // Discord API returns newest first, we want oldest first for chat flow
+
+                    this.$nextTick(() => {
+                        const scroller = document.getElementById('chat-scroller');
+                        scroller.scrollTop = scroller.scrollHeight;
+                    });
+
+                } catch (e) {
+                    console.error(e);
+                    // alert("Erro ao ler chat: " + e); // Opcional, removido para não spammar
+                } finally {
+                    this.loadingMessages = false;
+                }
+            },
+
+            formatDate(isoString) {
+                const date = new Date(isoString);
+                const today = new Date();
+                const isToday = date.getDate() === today.getDate() && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
+
+                const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+                if (isToday) return `Hoje às ${timeStr}`;
+                return `${date.toLocaleDateString('pt-BR')} ${timeStr}`;
+            },
+
+            formatContent(text) {
+                if (!text) return '';
+                // Basic markdown formatting simulation
+                let html = text
+                    .replace(/</g, '&lt;').replace(/>/g, '&gt;') // Escape HTML
+                    .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>') // Bold
+                    .replace(/\*(.*?)\*/g, '<i>$1</i>') // Italic
+                    .replace(/`(.*?)`/g, '<code class="bg-[#2f3136] px-1 rounded text-sm font-mono">$1</code>') // Inline Code
+                    .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" class="text-blue-400 hover:underline">$1</a>'); // Links
+                return html;
+            }
+        }
+    }
+</script>
+{% endblock %}

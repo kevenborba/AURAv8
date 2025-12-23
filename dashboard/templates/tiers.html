@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6" x-data="tierManager()">
+
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-white">Gestão de Planos & Permissões</h1>
+            <p class="text-gray-400">Ative ou desative módulos para cada nível de licença em tempo real.</p>
+        </div>
+        <button @click="fetchData" class="text-gray-400 hover:text-white transition">
+            🔄 Atualizar
+        </button>
+    </div>
+
+    <!-- 🚨 ORPHAN DETECTOR ALERT -->
+    <div x-show="orphans.length > 0" class="bg-red-500/10 border border-red-500/30 p-6 rounded-2xl animate-pulse"
+        style="display: none;">
+        <div class="flex items-start gap-4">
+            <div class="p-3 bg-red-500/20 rounded-lg">
+                <span class="text-2xl">🕵️‍♂️</span>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-red-400">Módulos Esquecidos Detectados!</h3>
+                <p class="text-gray-300 text-sm mb-3">
+                    Os seguintes sistemas foram carregados pelo Bot mas <b>NÃO</b> estão atribuídos a nenhuma
+                    licença.<br>
+                    Isso significa que ninguém consegue usá-los (exceto o Dono).
+                </p>
+                <div class="flex flex-wrap gap-2">
+                    <template x-for="mod in orphans" :key="mod">
+                        <span
+                            class="px-3 py-1 bg-red-500/20 text-red-300 rounded-full font-mono text-sm border border-red-500/30"
+                            x-text="mod"></span>
+                    </template>
+                </div>
+                <p class="text-red-500/50 text-xs mt-3 uppercase font-bold tracking-widest">Ação Necessária: Marque-os
+                    na tabela abaixo para liberar.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN MATRIX -->
+    <div class="glass-card p-6 rounded-2xl border border-white/5 overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr>
+                    <th class="p-4 text-gray-400 font-medium w-1/5">Módulo / Sistema</th>
+                    <!-- TIER HEADERS -->
+                    <th class="p-4 text-center w-1/5">
+                        <div class="flex flex-col items-center">
+                            <span class="text-2xl mb-1">🎫</span>
+                            <span class="font-bold text-gray-300">START</span>
+                            <span class="text-xs text-gray-500">Básico</span>
+                        </div>
+                    </th>
+                    <th class="p-4 text-center w-1/5">
+                        <div class="flex flex-col items-center">
+                            <span class="text-2xl mb-1">⚔️</span>
+                            <span class="font-bold text-purple-400">FACTION</span>
+                            <span class="text-xs text-gray-500">Intermediário</span>
+                        </div>
+                    </th>
+                    <th class="p-4 text-center w-1/5">
+                        <div class="flex flex-col items-center">
+                            <span class="text-2xl mb-1">👮</span>
+                            <span class="font-bold text-blue-400">POLICE</span>
+                            <span class="text-xs text-gray-500">Avançado</span>
+                        </div>
+                    </th>
+                    <th class="p-4 text-center w-1/5">
+                        <div class="flex flex-col items-center">
+                            <span class="text-2xl mb-1">💎</span>
+                            <span class="font-bold text-yellow-400">AURA V8</span>
+                            <span class="text-xs text-gray-500">God Mode</span>
+                        </div>
+                    </th>
+                    <th class="p-4 text-center w-1/5">
+                        <div class="flex flex-col items-center">
+                            <span class="text-2xl mb-1">👑</span>
+                            <span class="font-bold text-red-500">OWNER</span>
+                            <span class="text-xs text-gray-500">Supremo</span>
+                        </div>
+                    </th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-white/5">
+                <template x-for="mod in allModules" :key="mod">
+                    <tr class="hover:bg-white/5 transition group">
+                        <!-- Module Name -->
+                        <td class="p-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-2 h-2 rounded-full"
+                                    :class="orphans.includes(mod) ? 'bg-red-500 animate-pulse' : 'bg-green-500'"></div>
+                                <span class="text-white font-mono font-bold capitalize" x-text="mod"></span>
+                                <span x-show="orphans.includes(mod)"
+                                    class="text-red-500 text-xs font-bold px-2 py-0.5 bg-red-500/10 rounded">NEW</span>
+                            </div>
+                        </td>
+
+                        <!-- Checkboxes for each Tier -->
+                        <td class="p-4 text-center bg-white/[0.02]">
+                            <input type="checkbox" :checked="hasPerm('start', mod)"
+                                @change="togglePerm('start', mod, $event)"
+                                class="w-5 h-5 rounded border-white/20 bg-black/50 text-purple-600 focus:ring-purple-500 focus:ring-offset-0 cursor-pointer transition">
+                        </td>
+                        <td class="p-4 text-center">
+                            <input type="checkbox" :checked="hasPerm('faction', mod)"
+                                @change="togglePerm('faction', mod, $event)"
+                                class="w-5 h-5 rounded border-white/20 bg-black/50 text-purple-600 focus:ring-purple-500 focus:ring-offset-0 cursor-pointer transition">
+                        </td>
+                        <td class="p-4 text-center bg-white/[0.02]">
+                            <input type="checkbox" :checked="hasPerm('police', mod)"
+                                @change="togglePerm('police', mod, $event)"
+                                class="w-5 h-5 rounded border-white/20 bg-black/50 text-purple-600 focus:ring-purple-500 focus:ring-offset-0 cursor-pointer transition">
+                        </td>
+                        <td class="p-4 text-center">
+                            <input type="checkbox" :checked="hasPerm('v8', mod)" @change="togglePerm('v8', mod, $event)"
+                                class="w-5 h-5 rounded border-white/20 bg-black/50 text-yellow-500 focus:ring-yellow-500 focus:ring-offset-0 cursor-pointer transition">
+                        </td>
+                        <td class="p-4 text-center">
+                            <input type="checkbox" :checked="hasPerm('owner', mod)"
+                                @change="togglePerm('owner', mod, $event)"
+                                class="w-5 h-5 rounded border-white/20 bg-black/50 text-red-500 focus:ring-red-500 focus:ring-offset-0 cursor-pointer transition">
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    function tierManager() {
+        return {
+            tiers: {},
+            allModules: [],
+            orphans: [],
+            loading: false,
+
+            init() {
+                this.fetchData();
+            },
+
+            async fetchData() {
+                this.loading = true;
+                const res = await fetch('/owner/api/tiers');
+                const data = await res.json();
+
+                this.tiers = data.tiers;
+                this.allModules = data.predictions;
+                this.orphans = data.orphans;
+                this.loading = false;
+            },
+
+            hasPerm(tier, module) {
+                if (!this.tiers[tier]) return false;
+                return this.tiers[tier].includes(module);
+            },
+
+            async togglePerm(tier, module, event) {
+                const enabled = event.target.checked;
+
+                // Otimista: Atualiza UI antes do backend
+                if (enabled) {
+                    if (!this.tiers[tier].includes(module)) this.tiers[tier].push(module);
+                    // Remove de orphans visualmente se for o primeiro assign
+                    this.orphans = this.orphans.filter(m => m !== module);
+                } else {
+                    this.tiers[tier] = this.tiers[tier].filter(m => m !== module);
+                }
+
+                // Envia pro backend
+                try {
+                    const res = await fetch('/owner/api/tiers/update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ tier, module, enabled })
+                    });
+                    const result = await res.json();
+
+                    if (!result.success) {
+                        alert("Erro ao salvar: " + result.error);
+                        // Reverte UI em caso de erro (Simples reload para consistência)
+                        this.fetchData();
+                    }
+                } catch (err) {
+                    alert("Erro de conexão: " + err);
+                    this.fetchData();
+                }
+            }
+        }
+    }
+</script>
+{% endblock %}

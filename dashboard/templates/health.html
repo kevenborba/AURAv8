@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div x-data="healthMonitor()" x-init="scanHealth()" class="space-y-8">
+
+    <!-- Header -->
+    <div class="flex justify-between items-end">
+        <div>
+            <h1 class="text-3xl font-bold text-white flex items-center gap-3">
+                <span class="text-pink-500">🩺</span> Health Doctor
+            </h1>
+            <p class="text-gray-400">Diagnóstico automático de permissões e integridade dos servidores.</p>
+        </div>
+        <button @click="scanHealth()" :disabled="scanning"
+            class="px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg transition shadow-lg shadow-pink-500/20 flex items-center gap-2">
+            <span x-show="!scanning">🔄 Re-escanear</span>
+            <span x-show="scanning" class="animate-spin">⌛</span>
+        </button>
+    </div>
+
+    <!-- Resultados -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Score Card -->
+        <div class="glass-card p-6 rounded-2xl flex flex-col items-center justify-center space-y-2">
+            <span class="text-gray-400 text-sm uppercase font-bold">Health Score</span>
+            <div class="text-6xl font-black" :class="getScoreColor(score)" x-text="score">?</div>
+            <span class="text-xs text-gray-500" x-text="resultText">Analisando...</span>
+        </div>
+
+        <!-- Problemas -->
+        <div class="md:col-span-2 glass-card p-6 rounded-2xl">
+            <h3 class="text-lg font-bold text-white mb-4">Relatório de Problemas</h3>
+
+            <div x-show="scanning" class="text-center py-8 text-gray-500 animate-pulse">
+                Varrendo servidores em busca de falhas...
+            </div>
+
+            <div x-show="!scanning && issues.length === 0" class="text-center py-8 text-green-400">
+                ✅ Nenhum problema crítico encontrado! Todos os sistemas operacionais.
+            </div>
+
+            <div x-show="!scanning && issues.length > 0"
+                class="space-y-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                <template x-for="issue in issues">
+                    <div class="bg-white/5 p-3 rounded-lg border-l-4 border-red-500 flex justify-between items-center">
+                        <div>
+                            <div class="text-white font-bold" x-text="issue.guild_name"></div>
+                            <div class="text-xs text-gray-400" x-text="issue.guild_id"></div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-red-400 font-bold text-sm" x-text="issue.error"></div>
+                            <button @click="fixIssue(issue.guild_id)"
+                                class="text-xs text-blue-400 underline mt-1">Tentar Fix</button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    function healthMonitor() {
+        return {
+            scanning: true,
+            score: '...',
+            resultText: 'Iniciando...',
+            issues: [],
+
+            async scanHealth() {
+                this.scanning = true;
+                this.issues = [];
+                this.score = '...';
+
+                try {
+                    const res = await fetch('/owner/api/health');
+                    const data = await res.json();
+
+                    this.issues = data.issues;
+                    this.calculateScore(data.total_guilds, data.issues.length);
+                } catch (e) {
+                    alert("Erro ao scannear: " + e);
+                } finally {
+                    this.scanning = false;
+                }
+            },
+
+            calculateScore(total, issues) {
+                if (total === 0) return this.score = 'N/A';
+
+                const percentage = ((total - issues) / total) * 100;
+
+                if (percentage === 100) { this.score = 'A+'; this.resultText = 'Perfeito'; }
+                else if (percentage >= 90) { this.score = 'A'; this.resultText = 'Saudável'; }
+                else if (percentage >= 80) { this.score = 'B'; this.resultText = 'Atenção'; }
+                else if (percentage >= 60) { this.score = 'C'; this.resultText = 'Degradado'; }
+                else { this.score = 'F'; this.resultText = 'Crítico'; }
+            },
+
+            getScoreColor(score) {
+                if (score.startsWith('A')) return 'text-green-500';
+                if (score.startsWith('B')) return 'text-blue-500';
+                if (score.startsWith('C')) return 'text-yellow-500';
+                return 'text-red-500';
+            },
+
+            async fixIssue(guild_id) {
+                alert("Funcionalidade de Auto-Fix em breve!\nPor enquanto, use o 'Ghost Join' na lista de servidores para arrumar manualmente.");
+            }
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,7 @@
+DISPLAY_NAME=Bot de Teste
+MAIN=main.py
+MEMORY=512
+VERSION=recommended
+LANGUAGE=python
+SUBDOMAIN=aurateste
+APPID=8ce2fd67-149b-44db-a9bd-1c5a14caff97

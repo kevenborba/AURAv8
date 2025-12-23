@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div x-data="blacklistManager()" x-init="fetchBans()" class="space-y-8">
+
+    <!-- Header -->
+    <div class="flex justify-between items-end">
+        <div>
+            <h1 class="text-3xl font-bold text-white flex items-center gap-3">
+                <span class="text-red-500">🛡️</span> Global Blacklist
+            </h1>
+            <p class="text-gray-400">Gerencie usuários proibidos de usar o bot em qualquer servidor.</p>
+        </div>
+        <button @click="openModal()"
+            class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition shadow-lg shadow-red-500/20 flex items-center gap-2">
+            <span>⛔</span> Novo Banimento
+        </button>
+    </div>
+
+    <!-- Tabela de Banidos -->
+    <div class="glass-card rounded-2xl overflow-hidden border-red-500/10">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-gray-300">
+                <thead class="bg-white/5 text-xs uppercase font-semibold text-gray-400">
+                    <tr>
+                        <th class="p-4">Usuário / ID</th>
+                        <th class="p-4">Motivo</th>
+                        <th class="p-4">Data</th>
+                        <th class="p-4">Prova</th>
+                        <th class="p-4 text-right">Ações</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5">
+                    <template x-for="ban in bans" :key="ban.user_id">
+                        <tr class="hover:bg-white/5 transition">
+                            <td class="p-4 text-white font-mono" x-text="ban.user_id"></td>
+                            <td class="p-4 text-gray-300 italic" x-text="ban.reason"></td>
+                            <td class="p-4 text-xs" x-text="formatDate(ban.timestamp)"></td>
+                            <td class="p-4">
+                                <a :href="ban.proof_url" target="_blank" x-show="ban.proof_url"
+                                    class="text-blue-400 hover:text-blue-300 text-xs underline">Ver Prova</a>
+                                <span x-show="!ban.proof_url" class="text-gray-600">-</span>
+                            </td>
+                            <td class="p-4 text-right">
+                                <button @click="revokeBan(ban.user_id)"
+                                    class="px-3 py-1 bg-white/10 hover:bg-white/20 text-white rounded text-sm transition">
+                                    Revogar
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+        <!-- Empty State -->
+        <div x-show="bans.length === 0" class="p-8 text-center text-gray-500">
+            Nenhum usuário banido (ainda).
+        </div>
+    </div>
+
+    <!-- Modal Novo Ban -->
+    <div x-show="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+        style="display: none;">
+        <div @click.away="showModal = false" class="glass-card p-8 rounded-2xl w-full max-w-md space-y-6">
+            <h2 class="text-2xl font-bold text-red-500">Banir Usuário</h2>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">ID do Usuário</label>
+                    <input type="text" x-model="form.user_id"
+                        class="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-white focus:border-red-500 outline-none"
+                        placeholder="Ex: 987654321098765432">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Motivo</label>
+                    <input type="text" x-model="form.reason"
+                        class="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-white focus:border-red-500 outline-none"
+                        placeholder="Ex: Exploit de bugs">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Link da Prova (Opcional)</label>
+                    <input type="text" x-model="form.proof_url"
+                        class="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-white focus:border-red-500 outline-none"
+                        placeholder="https://imgur.com/...">
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-4">
+                <button @click="showModal = false"
+                    class="px-4 py-2 text-gray-400 hover:text-white transition">Cancelar</button>
+                <button @click="createBan()"
+                    class="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition font-bold">BA-NIR!</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    function blacklistManager() {
+        return {
+            bans: [],
+            showModal: false,
+            form: { user_id: '', reason: '', proof_url: '' },
+
+            async fetchBans() {
+                const res = await fetch('/owner/api/bans');
+                this.bans = await res.json();
+            },
+
+            openModal() {
+                this.form = { user_id: '', reason: '', proof_url: '' };
+                this.showModal = true;
+            },
+
+            async createBan() {
+                if (!this.form.user_id || !this.form.reason) return alert("Preencha ID e Motivo!");
+
+                await fetch('/owner/api/bans/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.form)
+                });
+                this.showModal = false;
+                this.fetchBans();
+            },
+
+            async revokeBan(user_id) {
+                if (!confirm("Tem certeza que deseja desbanir este usuário? Ele poderá usar o bot novamente.")) return;
+                await fetch('/owner/api/bans/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id })
+                });
+                this.fetchBans();
+            },
+
+            formatDate(dateStr) {
+                return new Date(dateStr).toLocaleString('pt-BR');
+            }
+        }
+    }
+</script>
+{% endblock %}
